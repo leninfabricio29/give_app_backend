@@ -17,6 +17,11 @@ const {
     updateLocation
 } = require('../controllers/userController');
 
+const {
+    getUserNotifications,
+    markNotificationAsRead
+} = require('../controllers/notificationController');
+
 const router = express.Router();
 
 // Rutas de perfil (requieren autenticación)
@@ -39,5 +44,9 @@ router.delete('/vehicles/:vehicleId', authMiddleware, deleteVehicle);
 // Rutas de estado y ubicación
 router.patch('/status', authMiddleware, updateUserStatus);
 router.patch('/location', authMiddleware, updateLocation);
+
+// Rutas de notificaciones
+router.get('/notifications', authMiddleware, getUserNotifications);
+router.patch('/notifications/:id/read', authMiddleware, markNotificationAsRead);
 
 module.exports = router;

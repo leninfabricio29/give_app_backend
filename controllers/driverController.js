@@ -1,6 +1,7 @@
 const Ride = require('../models/Ride');
 const User = require('../models/User');
 const Rating = require('../models/Rating');
+const Notification = require('../models/Notification');
 const Subscription = require('../models/Subscription');
 const mongoose = require('mongoose');
 
@@ -365,6 +366,17 @@ exports.createRating = async (req, res) => {
         });
 
         await newRating.save();
+
+        //Crear la notificación para el motorizado
+        const notification = new Notification({
+            user: ride.driver,
+            title: 'Nueva calificación recibida',
+            message: `Has recibido una nueva calificación de ${rating} estrellas.`,
+            relatedRide: actualRideId
+        });
+        await notification.save();
+
+        console.log('Notificación de nueva calificación creada para el motorizado');
 
         // Actualizar el rating en la carrera
         await Ride.findByIdAndUpdate(actualRideId, { rating });
