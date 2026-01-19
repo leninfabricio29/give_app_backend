@@ -111,7 +111,7 @@ io.on('connection', (socket) => {
     });
 
     // Motorizado acepta carrera (evento directo del socket)
-    socket.on('ride_accepted', async (data) => {
+    /*socket.on('ride_accepted', async (data) => {
     console.log('Evento ride_accepted recibido:', data);
     const { rideId, clientId, driverId, driverName } = data;
     
@@ -145,7 +145,7 @@ io.on('connection', (socket) => {
     } catch (error) {
         console.error('Error obteniendo datos del driver:', error);
     }
-});
+});*/
 
     // Motorizado inicia la carrera (llegó al punto de recogida)
     socket.on('ride_started', (data) => {
