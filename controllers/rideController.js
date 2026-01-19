@@ -465,21 +465,13 @@ exports.completeRide = async (req, res) => {
         const { id } = req.params;
         const { rating } = req.body;
         
-        const ride = await Ride.findById(id);
+        const ride = await Ride.findById(id).populate('client', 'fullName phone');
         if (!ride) {
             return res.status(404).json({ error: 'Viaje no encontrado' });
         }
-        
-        // Guardar cliente antes de actualizar
-        const clientId = ride.client.toString();
 
-        //Popular cliente
-        const client = await clientId.populate('client', 'fullName phone');
+        const clientId = ride.client._id.toString();
 
-        console.log('Cliente para emitir:', client);
-
-
-        
         const updatedRide = await Ride.findByIdAndUpdate(
             id,
             { status: 'completed', rating: rating || 5, completedAt: new Date() },
@@ -489,7 +481,6 @@ exports.completeRide = async (req, res) => {
 
         // Emitir evento al cliente
         const { io } = require('../server');
-        console.log('Emitiendo ride_completed para ride:', id);
         io.to(`ride_${id}`).emit('ride_status_change', {
             rideId: id,
             status: 'completed',
@@ -501,7 +492,6 @@ exports.completeRide = async (req, res) => {
             price: updatedRide.price,
             distance: updatedRide.distance
         });
-        console.log('Evento ride_completed emitido para ride:', id);
         res.json(updatedRide);
     } catch (error) {
         console.error('Error al completar viaje:', error);
