@@ -112,13 +112,16 @@ io.on('connection', (socket) => {
 
     // Motorizado acepta carrera (evento directo del socket)
     socket.on('ride_accepted', async (data) => {
+    console.log('Evento ride_accepted recibido:', data);
     const { rideId, clientId, driverId, driverName } = data;
     
     try {
         // Obtener información completa del driver desde la base de datos
         const driver = await User.findById(driverId)
+
             .select('fullName phone profileImage rating totalRatings location vehicle recentRatings');
-        
+            
+        console.log('Datos del driver obtenidos:', driver);
         io.to(`client_${clientId}`).emit('ride_accepted', {
             rideId,
             driver,  // ✅ Enviar objeto completo del driver
