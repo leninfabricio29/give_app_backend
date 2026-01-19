@@ -111,17 +111,38 @@ io.on('connection', (socket) => {
     });
 
     // Motorizado acepta carrera (evento directo del socket)
-    socket.on('ride_accepted', (data) => {
-        const { rideId, clientId, driverId, driverName } = data;
+    socket.on('ride_accepted', async (data) => {
+    const { rideId, clientId, driverId, driverName } = data;
+    
+    try {
+        // Obtener información completa del driver desde la base de datos
+        const driver = await User.findById(driverId)
+            .select('fullName phone profileImage rating totalRatings location vehicle recentRatings');
+        
         io.to(`client_${clientId}`).emit('ride_accepted', {
             rideId,
+            driver,  // ✅ Enviar objeto completo del driver
             driverId,
             driverName,
             message: 'Tu carrera ha sido aceptada'
         });
-        // Notificar a otros motorizados que la carrera ya no está disponible
+        
+        // También emitir a la sala del ride para tracking
+        io.to(`ride_${rideId}`).emit('ride_accepted', {
+            rideId,
+            driver,
+            driverId,
+            driverName,
+            message: 'Tu carrera ha sido aceptada'
+        });
+        
+        // Notificar a otros motorizados
         socket.to('drivers_room').emit('ride_taken', { rideId });
-    });
+        
+    } catch (error) {
+        console.error('Error obteniendo datos del driver:', error);
+    }
+});
 
     // Motorizado inicia la carrera (llegó al punto de recogida)
     socket.on('ride_started', (data) => {
