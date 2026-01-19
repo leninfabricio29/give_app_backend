@@ -359,7 +359,6 @@ exports.acceptRide = async (req, res) => {
         const driverInfo = await User.findById(req.user.id).select('fullName phone profileImage rating location');
         const ratingStats = await Rating.getDriverAverageRating(req.user.id);
         
-        console.log('Driver info para emitir:', driverInfo);
         io.to(`client_${ride.client.toString()}`).emit('ride_accepted', {
             rideId: id,
             driver: {
@@ -378,11 +377,9 @@ exports.acceptRide = async (req, res) => {
             }
         });
 
-        console.log('Carrera aceptada emitida al cliente');
         // Notificar a otros motorizados que la carrera ya no está disponible
         io.to('drivers_room').emit('ride_taken', { rideId: id });
 
-        console.log('Notificación enviada a otros motorizados');
 
         res.json(updatedRide);
     } catch (error) {
