@@ -482,6 +482,7 @@ exports.completeRide = async (req, res) => {
 
         // Emitir evento al cliente
         const { io } = require('../server');
+        console.log('Emitiendo ride_completed para ride:', id);
         io.to(`ride_${id}`).emit('ride_status_change', {
             rideId: id,
             status: 'completed',
@@ -493,7 +494,7 @@ exports.completeRide = async (req, res) => {
             price: updatedRide.price,
             distance: updatedRide.distance
         });
-
+        console.log('Evento ride_completed emitido para ride:', id);
         res.json(updatedRide);
     } catch (error) {
         console.error('Error al completar viaje:', error);
