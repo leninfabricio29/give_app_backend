@@ -13,7 +13,7 @@ const mongoose = require('mongoose');
 exports.getHomeSummary = async (req, res) => {
     try {
         const driverId = req.user.id;
-        
+
         // Obtener inicio y fin del día actual
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -34,12 +34,12 @@ exports.getHomeSummary = async (req, res) => {
         ] = await Promise.all([
             // Carreras completadas HOY
             Ride.aggregate([
-                { 
-                    $match: { 
+                {
+                    $match: {
                         driver: new mongoose.Types.ObjectId(driverId),
                         status: 'completed',
                         updatedAt: { $gte: today, $lt: tomorrow }
-                    } 
+                    }
                 },
                 {
                     $group: {
@@ -50,30 +50,30 @@ exports.getHomeSummary = async (req, res) => {
                     }
                 }
             ]),
-            
+
             // Carreras del MES (para límite del plan)
             Ride.countDocuments({
                 driver: driverId,
                 status: { $in: ['completed', 'in_progress', 'accepted'] },
                 createdAt: { $gte: monthStart, $lte: monthEnd }
             }),
-            
+
             // Rating promedio
             Rating.getDriverAverageRating(driverId),
-            
+
             // Suscripción activa con plan
             Subscription.findOne({
                 user: driverId,
                 status: 'active'
             }).populate('plan').lean(),
-            
+
             // Datos del usuario
             User.findById(driverId).select('isOnline fullName profileImage').lean()
         ]);
 
         // Procesar resultados
         const todayStats = todayRides[0] || { count: 0, totalEarnings: 0, totalDistance: 0 };
-        
+
         // Calcular carreras restantes del plan
         const maxRides = subscription?.plan?.maxRidesPerMonth || 0;
         const ridesRemaining = Math.max(0, maxRides - monthRides);
@@ -93,7 +93,7 @@ exports.getHomeSummary = async (req, res) => {
                 profileImage: user?.profileImage || null,
                 isOnline: user?.isOnline || false
             },
-            
+
             // Estadísticas de HOY (métricas principales)
             today: {
                 ridesCompleted: todayStats.count,
@@ -102,13 +102,13 @@ exports.getHomeSummary = async (req, res) => {
                 commission: Math.round(commission * 100) / 100,
                 totalDistance: Math.round(todayStats.totalDistance * 100) / 100
             },
-            
+
             // Rating
             rating: {
                 average: ratingStats.averageRating,
                 totalReviews: ratingStats.totalRatings
             },
-            
+
             // Plan y límites
             plan: {
                 name: subscription?.plan?.name || 'Sin Plan',
@@ -120,7 +120,7 @@ exports.getHomeSummary = async (req, res) => {
                 isNearLimit: ridesUsedPercent >= 80,
                 hasReachedLimit: ridesRemaining === 0
             },
-            
+
             // Alertas inteligentes (basadas en uso)
             alerts: generateAlerts(ridesUsedPercent, ridesRemaining, todayStats.count)
         });
@@ -139,11 +139,11 @@ exports.getEarnings = async (req, res) => {
     try {
         const driverId = req.user.id;
         const { period = 'week' } = req.query; // 'today', 'week', 'month', 'all'
-        
+
         // Calcular fecha de inicio según período
         let startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
-        
+
         switch (period) {
             case 'today':
                 // Ya está configurado
@@ -164,17 +164,17 @@ exports.getEarnings = async (req, res) => {
             user: driverId,
             status: 'active'
         }).populate('plan').lean();
-        
+
         const commissionPercent = subscription?.plan?.commissionPercent || 15;
 
         // Estadísticas agregadas
         const stats = await Ride.aggregate([
-            { 
-                $match: { 
+            {
+                $match: {
                     driver: new mongoose.Types.ObjectId(driverId),
                     status: 'completed',
                     updatedAt: { $gte: startDate }
-                } 
+                }
             },
             {
                 $group: {
@@ -189,17 +189,17 @@ exports.getEarnings = async (req, res) => {
 
         // Ganancias por día (para gráfico)
         const dailyEarnings = await Ride.aggregate([
-            { 
-                $match: { 
+            {
+                $match: {
                     driver: new mongoose.Types.ObjectId(driverId),
                     status: 'completed',
                     updatedAt: { $gte: startDate }
-                } 
+                }
             },
             {
                 $group: {
-                    _id: { 
-                        $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' } 
+                    _id: {
+                        $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' }
                     },
                     rides: { $sum: 1 },
                     earnings: { $sum: '$price' }
@@ -215,10 +215,10 @@ exports.getEarnings = async (req, res) => {
             status: 'completed',
             updatedAt: { $gte: startDate }
         })
-        .select('description price distance updatedAt pickupLocation dropoffLocation')
-        .sort({ updatedAt: -1 })
-        .limit(20)
-        .lean();
+            .select('description price distance updatedAt pickupLocation dropoffLocation')
+            .sort({ updatedAt: -1 })
+            .limit(20)
+            .lean();
 
         const grossTotal = stats[0]?.grossEarnings || 0;
         const commission = grossTotal * (commissionPercent / 100);
@@ -331,7 +331,7 @@ exports.createRating = async (req, res) => {
     try {
         const { ride: rideId, rideId: altRideId, rating, comment, tags } = req.body;
         const clientId = req.user.id;
-        
+
         // Aceptar tanto 'ride' como 'rideId'
         const actualRideId = rideId || altRideId;
 
@@ -376,15 +376,23 @@ exports.createRating = async (req, res) => {
         });
         await notification.save();
 
-        console.log('Notificación de nueva calificación creada para el motorizado');
+        //emitir socket de nueva notificación si el motorizado está online
+        const { io } = require('../server');
+
+        io.emit('new_notification', {
+            rider: ride.driver.toString(),
+        });
+
+        //console.log('Notificación de nueva calificación enviada al motorizado:', ride.driver.toString());
+
 
         // Actualizar el rating en la carrera
         await Ride.findByIdAndUpdate(actualRideId, { rating });
 
         // Actualizar rating promedio del motorizado
         const ratingStats = await Rating.getDriverAverageRating(ride.driver);
-        await User.findByIdAndUpdate(ride.driver, { 
-            rating: ratingStats.averageRating 
+        await User.findByIdAndUpdate(ride.driver, {
+            rating: ratingStats.averageRating
         });
 
         res.status(201).json({
@@ -449,7 +457,7 @@ exports.respondToRating = async (req, res) => {
  */
 function generateAlerts(usagePercent, ridesRemaining, todayRides) {
     const alerts = [];
-    
+
     // Alerta de límite alcanzado
     if (ridesRemaining === 0) {
         alerts.push({
@@ -486,7 +494,7 @@ function generateAlerts(usagePercent, ridesRemaining, todayRides) {
             action: 'upgrade'
         });
     }
-    
+
     return alerts;
 }
 

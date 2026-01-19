@@ -17,6 +17,6 @@ router.get('/driver/ratings', authMiddleware, driverMiddleware, getMyRatings);
 router.put('/driver/ratings/:id/respond', authMiddleware, driverMiddleware, respondToRating);
 
 // Ruta de calificación (cualquier usuario autenticado puede calificar)
-router.post('/ratings', authMiddleware, createRating);
+router.post('/driver/ratings', authMiddleware, createRating);
 
 module.exports = router;
