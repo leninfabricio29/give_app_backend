@@ -30,7 +30,7 @@ exports.createRide = async (req, res) => {
         const price = priceService.calculatePrice(distance);
 
         // Obtener datos del cliente para enviar en el socket
-        const client = await User.findById(req.user.id).select('fullName phone');
+        const client = await User.findById(req.user.id).select('fullName phone profileImage');
 
         const ride = new Ride({
             client: req.user.id,
