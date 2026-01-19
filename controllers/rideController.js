@@ -51,7 +51,8 @@ exports.createRide = async (req, res) => {
             client: {
                 _id: req.user.id,
                 fullName: client.fullName,
-                phone: client.phone
+                phone: client.phone,
+                profileImage: client.profileImage
             }
         };
         emitNewRide(rideWithClient);
