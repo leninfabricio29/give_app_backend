@@ -472,6 +472,13 @@ exports.completeRide = async (req, res) => {
         
         // Guardar cliente antes de actualizar
         const clientId = ride.client.toString();
+
+        //Popular cliente
+        const client = await clientId.populate('client', 'fullName phone');
+
+        console.log('Cliente para emitir:', client);
+
+
         
         const updatedRide = await Ride.findByIdAndUpdate(
             id,
