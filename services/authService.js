@@ -87,7 +87,8 @@ exports.loginUser = async (email, password) => {
             profileImage: user.profileImage,
             status: user.status,
             isOnline: user.isOnline,
-            rating: user.rating
+            rating: user.rating,
+            points: user.points
         };
 
         // Si es motorista, obtener su suscripción

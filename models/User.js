@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
         url: { type: String, default: null },
         publicId: { type: String, default: null }
     },
+    points: { type: Number, default: 0 },
     role: { type: String, enum: ['admin', 'motorizado', 'cliente'], required: true },
     status: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' },
     isOnline: { type: Boolean, default: false },

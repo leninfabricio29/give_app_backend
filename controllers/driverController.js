@@ -376,6 +376,19 @@ exports.createRating = async (req, res) => {
         });
         await notification.save();
 
+        //Actualizar puntos del cliente que califica
+        await User.findByIdAndUpdate(req.user.id, { $inc: { points: 10 } });
+
+        
+
+        const notificationUser = new Notification({
+            user: req.user.id,
+            title: 'Haz ganado puntos',
+            message: `Has recibido 10 puntos por calificar una carrera.`,
+            relatedRide: actualRideId
+        });
+        await notificationUser.save();
+
         //emitir socket de nueva notificación si el motorizado está online
         const { io } = require('../server');
 
