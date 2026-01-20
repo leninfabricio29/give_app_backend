@@ -2,28 +2,29 @@ const Subscription = require('../models/Subscription');
 const Plan = require('../models/Plan');
 const Payment = require('../models/Payment');
 const Vehicle = require('../models/Vehicle');
+const Notification = require('../models/Notification');
 
 // Función auxiliar para ajustar vehículos según el plan
 const adjustVehiclesForPlan = async (userId, maxVehicles) => {
     const activeVehicles = await Vehicle.find({ owner: userId, status: 'active' })
         .sort({ createdAt: 1 }); // Los más antiguos primero
-    
+
     if (activeVehicles.length > maxVehicles) {
         // Desactivar los vehículos más recientes que excedan el límite
         const vehiclesToDeactivate = activeVehicles.slice(maxVehicles);
-        
+
         await Vehicle.updateMany(
             { _id: { $in: vehiclesToDeactivate.map(v => v._id) } },
             { status: 'inactive' }
         );
-        
+
         return {
             adjusted: true,
             deactivated: vehiclesToDeactivate.length,
             message: `Se desactivaron ${vehiclesToDeactivate.length} vehículo(s) por límite del plan`
         };
     }
-    
+
     return { adjusted: false };
 };
 
@@ -34,8 +35,8 @@ exports.createPlan = async (req, res) => {
 
         // Validar campos requeridos
         if (!name || price === undefined || !maxRidesPerMonth || !maxVehicles || commissionPercent === undefined) {
-            return res.status(400).json({ 
-                error: 'Campos requeridos faltantes: name, price, maxRidesPerMonth, maxVehicles, commissionPercent' 
+            return res.status(400).json({
+                error: 'Campos requeridos faltantes: name, price, maxRidesPerMonth, maxVehicles, commissionPercent'
             });
         }
 
@@ -73,7 +74,7 @@ exports.getPlans = async (req, res) => {
 exports.subscribePlan = async (req, res) => {
     try {
         const { planId } = req.body;
-        
+
         if (!planId) {
             return res.status(400).json({ error: 'El ID del plan es requerido' });
         }
@@ -101,24 +102,28 @@ exports.subscribePlan = async (req, res) => {
             subscription.plan = planId;
             subscription.startDate = new Date();
             subscription.endDate = null;
-            
+
             // Ajustar vehículos si el nuevo plan tiene menos límite
             vehicleAdjustment = await adjustVehiclesForPlan(req.user.id, plan.maxVehicles);
         } else {
+            //Calcular fecha de finalización (30 días desde hoy)
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 30);
             // Crear nueva suscripción
             subscription = new Subscription({
                 user: req.user.id,
                 plan: planId,
                 status: 'active',
-                startDate: new Date()
+                startDate: new Date(),
+                endDate: endDate
             });
         }
 
         await subscription.save();
-        
+
         // Retornar con los datos del plan
         const populatedSubscription = await subscription.populate('plan');
-        
+
         res.status(201).json({
             message: 'Suscripción exitosa',
             subscription: populatedSubscription,
@@ -134,16 +139,16 @@ exports.subscribePlan = async (req, res) => {
 exports.getUserSubscription = async (req, res) => {
     try {
         const Ride = require('../models/Ride');
-        
+
         const subscription = await Subscription.findOne({
             user: req.user.id,
             status: 'active'
         }).populate('plan');
 
         if (!subscription) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 error: 'Sin suscripción activa',
-                hasSubscription: false 
+                hasSubscription: false
             });
         }
 
@@ -211,8 +216,11 @@ exports.uploadPaymentProof = async (req, res) => {
 
         // Calcular período del pago (mes actual o próximo si ya pagó este mes)
         const now = new Date();
-        let periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        let periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        let periodStart = new Date(now);
+
+        // Fin: +1 mes (misma fecha)
+        let periodEnd = new Date(now);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
 
         // Verificar si ya existe un pago aprobado para este período
         const existingApprovedPayment = await Payment.findOne({
@@ -236,8 +244,8 @@ exports.uploadPaymentProof = async (req, res) => {
         });
 
         if (pendingPayment) {
-            return res.status(400).json({ 
-                error: 'Ya tienes un pago pendiente de verificación. Espera a que sea procesado.' 
+            return res.status(400).json({
+                error: 'Ya tienes un pago pendiente de verificación. Espera a que sea procesado.'
             });
         }
 
@@ -259,7 +267,12 @@ exports.uploadPaymentProof = async (req, res) => {
         });
 
         await payment.save();
-        
+
+        //Captura la suscripción para posibles 
+
+        subscription.status = 'pending';
+        await subscription.save();
+
         res.status(201).json({
             success: true,
             payment: await payment.populate(['plan', 'subscription']),
@@ -283,7 +296,7 @@ exports.getMyPayments = async (req, res) => {
         const totalPaid = payments
             .filter(p => p.status === 'approved')
             .reduce((sum, p) => sum + p.amount, 0);
-        
+
         const pendingPayments = payments.filter(p => ['pending', 'verifying'].includes(p.status));
 
         res.json({
@@ -305,13 +318,13 @@ exports.getMyPayments = async (req, res) => {
 // Verificar pago (solo admin)
 exports.verifyPayment = async (req, res) => {
     try {
-        
+
 
         const { paymentId } = req.params;
         const { approved, rejectionReason } = req.body;
 
         const payment = await Payment.findById(paymentId).populate('subscription');
-        
+
         if (!payment) {
             return res.status(404).json({ error: 'Pago no encontrado' });
         }
@@ -324,7 +337,7 @@ exports.verifyPayment = async (req, res) => {
             };
 
             // Activar/renovar la suscripción
-            await Subscription.findByIdAndUpdate(payment.subscription._id, {
+             await Subscription.findByIdAndUpdate(payment.subscription._id, {
                 status: 'active',
                 startDate: payment.periodStart,
                 endDate: payment.periodEnd,
@@ -340,6 +353,23 @@ exports.verifyPayment = async (req, res) => {
         }
 
         await payment.save();
+
+        const notification = new Notification({
+            user: payment.user,
+            title: approved ? 'Pago aprobado' : 'Pago rechazado',
+            message: approved
+            ? 'Tu pago ha sido aceptado. ¡Tu suscripción está activa!'
+            : 'Tu pago ha sido rechazado. Por favor, revisa el comprobante y vuelve a intentarlo.',
+            relatedPayment: payment._id
+        });
+        await notification.save();
+
+        //emitir socket de nueva notificación si el motorizado está online
+        const { io } = require('../server');
+
+        io.emit('new_notification', {
+            rider: payment.user.toString(),
+        });
 
         res.json({
             success: true,
@@ -380,7 +410,7 @@ exports.getPayments = async (req, res) => {
 
         const { status, userId } = req.query;
         const filter = {};
-        
+
         if (status) filter.status = status;
         if (userId) filter.user = userId;
 
@@ -400,7 +430,7 @@ exports.checkSubscriptionStatus = async (req, res) => {
     try {
         const subscription = await Subscription.findOne({
             user: req.user.id,
-            status: 'active'
+            //status: 'active'
         }).populate('plan');
 
         if (!subscription) {
@@ -420,3 +450,6 @@ exports.checkSubscriptionStatus = async (req, res) => {
         res.status(500).json({ error: 'Error al verificar suscripción' });
     }
 };
+
+
+

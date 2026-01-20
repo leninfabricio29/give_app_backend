@@ -6,7 +6,7 @@ const subscriptionSchema = new mongoose.Schema({
     plan: { type: mongoose.Schema.Types.ObjectId, ref: 'Plan', required: true },
     startDate: { type: Date, default: Date.now },
     endDate: { type: Date },
-    status: { type: String, enum: ['active', 'inactive', 'expired'], default: 'active' },
+    status: { type: String, enum: ['active', 'inactive', 'expired', 'pending'], default: 'active' },
     renewalDate: { type: Date },
     autoRenew: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }

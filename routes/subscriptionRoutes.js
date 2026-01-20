@@ -11,7 +11,8 @@ const {
     verifyPayment,
     getPendingPayments,
     getPayments,
-    checkSubscriptionStatus
+    checkSubscriptionStatus,
+    
 } = require('../controllers/subscriptionController');
 
 const router = express.Router();
