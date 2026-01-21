@@ -2,7 +2,7 @@ const authService = require('../services/authService');
 // Registro de usuario
 exports.registerController = async (req, res) => {
     try {
-        const { email, password, fullName, role, cedula, phone } = req.body;
+        const { email, password, fullName, role, cedula, phone, fcmToken, platform } = req.body;
         
         const result = await authService.registerUser({
             email,
@@ -10,7 +10,9 @@ exports.registerController = async (req, res) => {
             fullName,
             role,
             cedula,
-            phone
+            phone,
+            fcmToken,
+            platform
         });
 
         res.status(201).json({

@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 // Registrar usuario
 exports.registerUser = async (userData) => {
     try {
-        const { email, password, fullName, role, cedula, phone } = userData;
+        const { email, password, fullName, role, cedula, phone, fcmToken, platform } = userData;
 
         // Verificar si el usuario ya existe
         const existingUser = await User.findOne({ email });
@@ -35,6 +35,25 @@ exports.registerUser = async (userData) => {
             process.env.JWT_SECRET || 'secret',
             { expiresIn: '24h' }
         );
+
+        // Crear registro de FCM Device si se proporciona token
+        if (fcmToken) {
+            let fcmDevice = await FcmDevice.findOne({ deviceToken: fcmToken });
+            if (fcmDevice) {
+                fcmDevice.user = user._id;
+                fcmDevice.platform = platform;
+                await fcmDevice.save();
+            } else {
+                fcmDevice = new FcmDevice({
+                    user: user._id,
+                    deviceToken: fcmToken,
+                    platform,
+                    lastLoginAt: new Date(),
+                    isActive: true
+                });
+                await fcmDevice.save();
+            }
+        }
 
         // Devolver todos los datos del usuario
         return {
