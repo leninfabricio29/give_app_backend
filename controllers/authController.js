@@ -1,5 +1,4 @@
 const authService = require('../services/authService');
-
 // Registro de usuario
 exports.registerController = async (req, res) => {
     try {
@@ -27,9 +26,9 @@ exports.registerController = async (req, res) => {
 // Login de usuario
 exports.loginController = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, fcmToken, platform } = req.body;
         
-        const result = await authService.loginUser(email, password);
+        const result = await authService.loginUser(email, password, fcmToken, platform);
 
         res.status(200).json({
             message: 'Login exitoso',

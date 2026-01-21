@@ -4,7 +4,11 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
+const { initializeFirebase } = require('./services/firebaseService');
+
 require('dotenv').config();
+initializeFirebase(); 
+
 
 const app = express();
 const server = http.createServer(app);
@@ -40,6 +44,7 @@ app.use('/api/users', userRoutes);
 app.use('/api', rideRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api', driverRoutes);
+
 
 // Almacenar conexiones de motorizados online
 const onlineDrivers = new Map(); // { driverId: socketId }

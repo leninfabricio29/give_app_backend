@@ -1,9 +1,14 @@
 const Ride = require('../models/Ride');
 const User = require('../models/User');
 const Rating = require('../models/Rating');
+const FcmDevice = require('../models/FcmDevice');
 const Notification = require('../models/Notification');
 const Subscription = require('../models/Subscription');
 const mongoose = require('mongoose');
+
+const admin = require('firebase-admin');
+
+
 
 /**
  * GET /driver/home-summary
@@ -370,24 +375,80 @@ exports.createRating = async (req, res) => {
         //Crear la notificación para el motorizado
         const notification = new Notification({
             user: ride.driver,
-            title: 'Nueva calificación recibida',
+            title: 'Nueva calificación recibida 🎉',
             message: `Has recibido una nueva calificación de ${rating} estrellas.`,
             relatedRide: actualRideId
         });
         await notification.save();
 
+
+        const clientUser = await User.findById(ride.client);
+
+        //Enviar notificación push al motorizado usando FCM
+        const fcmDevice = await FcmDevice.findOne({ user: ride.driver });
+        if (!fcmDevice || !fcmDevice.deviceToken) {
+            console.log('No se encontró token FCM para el motorizado:', ride.driver.toString());
+        } else {
+            await admin.messaging().send({
+                token: fcmDevice.deviceToken,
+                notification: {
+                    title: 'Nueva calificación recibida 🎉',
+                    body: `Has recibido una nueva calificación de ${rating} estrellas por parte de ${clientUser?.fullName || 'un cliente'}.`,
+                },
+                android: {
+                    priority: 'high',
+                    notification: {
+                        sound: 'default'
+                    },
+                },
+                data: {
+                    rideId: actualRideId.toString(),
+                    type: 'new_rating',
+                },
+            });
+        }
+
+
+
         //Actualizar puntos del cliente que califica
         await User.findByIdAndUpdate(req.user.id, { $inc: { points: 10 } });
 
-        
+
 
         const notificationUser = new Notification({
             user: req.user.id,
-            title: 'Haz ganado puntos',
+            title: 'Haz ganado puntos 🎉',
             message: `Has recibido 10 puntos por calificar una carrera.`,
             relatedRide: actualRideId
         });
         await notificationUser.save();
+
+
+        //Enviar notificacion push cuando el cliente gana puntos
+        const fcmDeviceUser = await FcmDevice.findOne({ user: req.user.id });
+        if (!fcmDeviceUser || !fcmDeviceUser.deviceToken) {
+            console.log('No se encontró token FCM para el cliente:', req.user.id);
+        } else {
+            await admin.messaging().send({
+                token: fcmDeviceUser.deviceToken,
+                notification: {
+                    title: '¡Has ganado puntos! 🎉',
+                    body: `Has recibido 10 puntos por calificar una carrera.`,
+                },
+                android: {
+                    priority: 'high',
+                    notification: {
+                        sound: 'default'
+                    },
+                },
+                data: {
+                    rideId: actualRideId.toString(),
+                    type: 'new_points',
+                },
+            });
+        }
+
+        
 
         //emitir socket de nueva notificación si el motorizado está online
         const { io } = require('../server');

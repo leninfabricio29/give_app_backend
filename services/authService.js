@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
+const FcmDevice = require('../models/FcmDevice');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
@@ -57,7 +58,7 @@ exports.registerUser = async (userData) => {
 };
 
 // Login de usuario
-exports.loginUser = async (email, password) => {
+exports.loginUser = async (email, password, fcmToken, platform) => {
     try {
         const user = await User.findOne({ email });
         if (!user) {
@@ -106,6 +107,27 @@ exports.loginUser = async (email, password) => {
                     startDate: subscription.startDate
                 };
             }
+        }
+
+        //console.log('User logged in:', userData);
+
+        //Crear registro de FCM Device si no existe
+        const fcmDevice = await FcmDevice.findOne({ deviceToken: fcmToken });
+        if (fcmDevice) {
+            fcmDevice.user = user._id;
+            fcmDevice.platform = platform;
+            fcmDevice.lastLoginAt = new Date();
+            fcmDevice.isActive = true;
+            await fcmDevice.save();
+        } else {
+            fcmDevice = new FcmDevice({
+                user: user._id,
+                deviceToken: fcmToken,
+                platform,
+                lastLoginAt: new Date(),
+                isActive: true
+            });
+            await fcmDevice.save();
         }
 
         // Devolver todos los datos del usuario

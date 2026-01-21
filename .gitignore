@@ -20,3 +20,5 @@ yarn-error.log*
 *.sublime-workspace
 .env.production
 .expo
+# Ignorar la carpeta de llaves
+keys/
